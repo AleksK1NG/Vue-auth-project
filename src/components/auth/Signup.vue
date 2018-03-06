@@ -2,30 +2,36 @@
   <div id="signup">
     <div class="signup-form">
       <form @submit.prevent="onSubmit">
-        <div class="input">
+        <div class="input" :class="{invalid: $v.email.$error}">
           <label for="email">Mail</label>
           <input
+            @blur="$v.email.$touch()"
             type="email"
             id="email"
             v-model="email">
+          <p v-if="!$v.email.email">Please enter correct email</p>
         </div>
-        <div class="input">
+        <div class="input" :class="{invalid: $v.age.$error}">
           <label for="age">Your Age</label>
           <input
+            @blur="$v.age.$touch()"
             type="number"
             id="age"
             v-model.number="age">
+          <p v-if="!$v.age.minValue">Min age is {{ $v.age.$params.minValue.min }}</p>
         </div>
-        <div class="input">
+        <div class="input" :class="{invalid: $v.password.$error}">
           <label for="password">Password</label>
           <input
+            @blur="$v.password.$touch()"
             type="password"
             id="password"
             v-model="password">
         </div>
-        <div class="input">
+        <div class="input" :class="{invalid: $v.confirmPassword.$error}">
           <label for="confirm-password">Confirm Password</label>
           <input
+            @blur="$v.confirmPassword.$touch()"
             type="password"
             id="confirm-password"
             v-model="confirmPassword">
@@ -44,24 +50,31 @@
           <button @click="onAddHobby" type="button">Add Hobby</button>
           <div class="hobby-list">
             <div
+              :class="{invalid: $v.hobbyInputs.$each[index].$error}"
               class="input"
               v-for="(hobbyInput, index) in hobbyInputs"
               :key="hobbyInput.id">
               <label :for="hobbyInput.id">Hobby #{{ index }}</label>
               <input
+                @blur="$v.hobbyInputs.$each[index].value.$touch()"
                 type="text"
                 :id="hobbyInput.id"
                 v-model="hobbyInput.value">
               <button @click="onDeleteHobby(hobbyInput.id)" type="button">X</button>
+              <p v-if="!$v.hobbyInputs.minLength">You have {{$v.hobbyInputs.$params.minLength.min}} hobbies, min 1 need</p>
             </div>
           </div>
         </div>
-        <div class="input inline">
-          <input type="checkbox" id="terms" v-model="terms">
+        <div class="input inline" :class="{invalid: $v.terms.$invalid}">
+          <input
+            @change="$v.terms.$touch()"
+            type="checkbox"
+            id="terms"
+            v-model="terms">
           <label for="terms">Accept Terms of Use</label>
         </div>
         <div class="submit">
-          <button type="submit">Submit</button>
+          <button type="submit" :disabled="$v.$invalid">Submit</button>
         </div>
       </form>
     </div>
@@ -70,6 +83,8 @@
 
 <script>
 
+import { required, email, numeric, minValue, minLength, sameAs, requiredUnless } from 'vuelidate/lib/validators'
+  import axios from 'axios'
   export default {
     data: () => {
       return {
@@ -81,6 +96,46 @@
         hobbyInputs: [],
         terms: false
       }
+    },
+    validations: {
+      email: {
+        required: required,
+        email: email,
+        unique: (value) => {
+          if (value === '') return true
+          return axios.get('/user.json?orderBy="email"&equalTo="' + value + '"')
+            .then(res => {
+              console.log(res);
+              return Object.keys(res.data).length === 0
+            })
+        },
+      },
+      age: {
+        required,
+        numeric,
+        minValue: minValue(18),
+      },
+      password: {
+        required: required,
+        minLength: minLength(6),
+      },
+      confirmPassword: {
+        sameAs: sameAs('password')
+      },
+      terms: {
+        required: requiredUnless(vm => {
+          return vm.country === 'Russia'
+        }),
+      },
+      hobbyInputs: {
+        minLength: minLength(1),
+        $each: {
+          value: {
+            required,
+            minLength: minLength(4)
+          }
+        }
+      },
     },
     methods: {
       onAddHobby () {
@@ -151,6 +206,15 @@
     background-color: #eee;
   }
 
+  .input.invalid label {
+   color: red;
+  }
+
+  .input.invalid input {
+    border: 1px solid red;
+    background-color: #ffc9aa;
+  }
+
   .input select {
     border: 1px solid #ccc;
     font: inherit;
@@ -196,4 +260,5 @@
     color: #ccc;
     cursor: not-allowed;
   }
+
 </style>
